@@ -32,19 +32,9 @@
     </div>
     {% else %}
     <div x-data="depositStatus({{ open_deposit.pk }}, '{{ open_deposit.status }}')" x-init="init()">
-      <div class="border border-black/10 rounded-2xl p-6 mb-4 bg-white">
-        <p class="text-sm text-muted mb-4">Pay <span class="font-semibold text-ink">${{ open_deposit.price_amount|floatformat:2 }}</span> in USDT-TRC20 through NowPayments' secure checkout:</p>
-        <a href="{{ open_deposit.invoice_url }}" target="_blank" rel="noopener"
-           class="inline-flex items-center justify-center gap-2 w-full bg-ballred text-white font-bold px-6 py-3 rounded-2xl border border-black/10 hover:opacity-90 transition">
-          {% include "core/svg/tron.html" %}
-          Pay with USDT-TRC20 →
-        </a>
-        <p class="text-xs text-muted mt-3">Status: <span x-text="status" class="font-semibold"></span></p>
-      </div>
-
-      {% if open_deposit.pay_address %}
-      <div class="border border-black/10 rounded-2xl p-6 mb-6 bg-white text-left">
-        <p class="text-xs uppercase tracking-widest text-muted mb-3">Or send manually</p>
+      <div class="border border-black/10 rounded-2xl p-6 mb-6 bg-white">
+        <p class="text-xs uppercase tracking-widest text-muted mb-3">Send USDT-TRC20 to this address</p>
+        {% if open_deposit.pay_address %}
         <div class="mx-auto w-40 h-40 flex items-center justify-center [&_svg]:w-full [&_svg]:h-full mb-4">
           {{ qr_svg|safe }}
         </div>
@@ -56,8 +46,11 @@
           </button>
         </div>
         <p class="text-xs text-muted">Send exactly <span class="tabular-nums font-semibold">{{ open_deposit.pay_amount }}</span> USDT-TRC20 — sending on another chain or token will result in lost funds.</p>
+        {% else %}
+        <p class="text-sm text-muted">Setting up your payment address…</p>
+        {% endif %}
+        <p class="text-xs text-muted mt-3">Status: <span x-text="status" class="font-semibold"></span></p>
       </div>
-      {% endif %}
     </div>
     {% endif %}
   {% else %}

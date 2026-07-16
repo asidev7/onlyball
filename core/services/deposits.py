@@ -10,22 +10,24 @@ from . import nowpayments
 
 @transaction.atomic
 def create_deposit(user, price_amount, ipn_callback_url: str) -> Deposit:
-    """Creates a USDT-TRC20 deposit invoice via NowPayments for a chosen
-    USD amount, and stores it as a Deposit row keyed by `order_id` (the
-    NowPayments payment_id/pay_address aren't known until the user opens
-    invoice_url -- see services.nowpayments.create_invoice). The deposit
-    is credited to the user's ledger later, either by the IPN webhook or
-    the poll_pending_deposits fallback task, once NowPayments reports it
-    'finished' (see core.tasks).
+    """Creates a USDT-TRC20 deposit via NowPayments' Payment API (not the
+    Invoice API) for a chosen USD amount, so pay_address/pay_amount come
+    back immediately and can be shown as a QR code on our own /deposit
+    page -- no redirect to a NowPayments-hosted page required. The
+    deposit is credited to the user's ledger later, either by the IPN
+    webhook or the poll_pending_deposits fallback task, once NowPayments
+    reports it 'finished' (see core.tasks).
     """
     order_id = uuid.uuid4().hex
-    invoice = nowpayments.create_invoice(price_amount, order_id, ipn_callback_url)
+    payment = nowpayments.create_payment(price_amount, order_id, ipn_callback_url)
     return Deposit.objects.create(
         user=user,
         order_id=order_id,
-        invoice_url=invoice.get('invoice_url', ''),
+        payment_id=str(payment.get('payment_id', '')),
+        pay_address=payment.get('pay_address', ''),
+        pay_amount=payment.get('pay_amount'),
         price_amount=price_amount,
-        status=Deposit.Status.WAITING,
+        status=payment.get('payment_status', Deposit.Status.WAITING),
     )
 
 

@@ -48,6 +48,25 @@ def create_invoice(price_amount, order_id: str, ipn_callback_url: str, price_cur
     return resp.json()
 
 
+def create_payment(price_amount, order_id: str, ipn_callback_url: str, price_currency: str = 'usd') -> dict:
+    """Creates a NowPayments payment directly (rather than an Invoice), so
+    `pay_address`/`pay_amount`/`payment_id` come back immediately in the
+    response instead of only after the user opens a hosted invoice_url
+    page. Used instead of create_invoice so the deposit address and QR
+    code can be shown on our own /deposit page right away.
+    """
+    resp = requests.post(_url('payment'), headers=_headers(), json={
+        'price_amount': float(price_amount),
+        'price_currency': price_currency,
+        'pay_currency': settings.PAY_CURRENCY,
+        'order_id': order_id,
+        'order_description': f'OnlyBall deposit {order_id}',
+        'ipn_callback_url': ipn_callback_url,
+    }, timeout=15)
+    resp.raise_for_status()
+    return resp.json()
+
+
 def get_payment_status(payment_id: str) -> dict:
     resp = requests.get(_url(f'payment/{payment_id}'), headers=_headers(), timeout=15)
     resp.raise_for_status()

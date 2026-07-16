@@ -148,12 +148,12 @@ class WalletLink(models.Model):
 
 
 class Deposit(models.Model):
-    """One USDT-TRC20 deposit created via the NowPayments Invoice API
-    (services.nowpayments.create_invoice). `order_id` is generated
-    up-front and is what the IPN webhook uses to find this row -- the
-    NowPayments `payment_id` (and pay_address/pay_amount) aren't assigned
-    until the user actually opens `invoice_url` and picks a payment
-    method, so they start blank. `status` mirrors NowPayments'
+    """One USDT-TRC20 deposit created via the NowPayments Payment API
+    (services.nowpayments.create_payment). `order_id` is generated
+    up-front and is what the IPN webhook uses to find this row;
+    `payment_id`/`pay_address`/`pay_amount` come back in the same API call
+    and are stored immediately, so the address/QR code can be shown on our
+    own /deposit page right away. `status` mirrors NowPayments'
     payment_status values; the ledger is credited once (idempotently, see
     services.deposits.apply_payment_update) when it reaches 'finished'.
     """
