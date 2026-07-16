@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Sign in — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="max-w-md mx-auto px-4 py-16">
+  <h1 class="font-display font-bold text-3xl mb-2">Sign in</h1>
+
+  <form method="post" class="space-y-4">
+    {% csrf_token %}
+    {% for field in form %}
+    <div>
+      <label class="block text-sm font-semibold mb-1">{{ field.label }}</label>
+      {{ field }}
+      {% for error in field.errors %}<p class="text-xs text-ballred mt-1">{{ error }}</p>{% endfor %}
+    </div>
+    {% endfor %}
+    <button type="submit" class="w-full bg-ballred text-white font-bold px-6 py-3 rounded-2xl border border-black/10 hover:opacity-90 transition">
+      Sign in
+    </button>
+  </form>
+
+  <p class="text-sm mt-6">No account yet? <a href="{% url 'signup' %}" class="text-ballred font-semibold hover:underline">Sign up</a></p>
+</section>
+{% endblock %}

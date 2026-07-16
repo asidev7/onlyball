@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Withdraw — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="max-w-md mx-auto px-4 py-16">
+  <h1 class="font-display font-bold text-3xl mb-2 text-center">Withdraw USDT</h1>
+  <p class="text-sm text-muted mb-2 text-center">Balance: <span class="font-semibold text-ink">${{ usdt_balance|floatformat:2 }}</span> · Minimum {{ min_withdraw_usdt }} USDT</p>
+  <p class="text-xs text-muted mb-8 text-center">Sent as USDT-TRC20 (Tron network) via NowPayments — enter a valid Tron address (starts with "T").</p>
+
+  <form method="post" class="space-y-4 border border-black/10 rounded-2xl p-6 bg-white">
+    {% csrf_token %}
+    {% for field in form %}
+    <div>
+      <label class="block text-sm font-semibold mb-1">{{ field.label }}</label>
+      {{ field }}
+      {% for error in field.errors %}<p class="text-xs text-ballred mt-1">{{ error }}</p>{% endfor %}
+    </div>
+    {% endfor %}
+    <button type="submit" class="w-full bg-ballred text-white font-bold px-6 py-3 rounded-2xl border border-black/10 hover:opacity-90 transition">
+      Request withdrawal
+    </button>
+  </form>
+
+  <p class="text-xs text-muted mt-6 text-center">
+    Withdrawals above the KYC threshold require identity verification before funds are sent. See <a href="{% url 'legal' %}" class="underline">Legal</a>.
+  </p>
+</section>
+{% endblock %}

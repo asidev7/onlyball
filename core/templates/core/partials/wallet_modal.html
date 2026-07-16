@@ -1,0 +1,183 @@
+{% comment %}
+Connect-wallet modal. Uses each wallet's injected browser-extension
+provider (window.solana for Phantom/Trust Wallet-Solana, window.ethereum
+for MetaMask, window.tronLink/window.tronWeb for TronLink) to sign a
+server-issued nonce, proving address ownership.
+
+NOTE on WalletConnect v2: the product brief also asks for Trust Wallet and
+MetaMask via WalletConnect v2 (for mobile wallets without a browser
+extension). That requires a free project ID from cloud.walletconnect.com
+plus the @walletconnect/sign-client relay/QR flow. Without a provisioned
+project ID this repo can't wire up the actual relay, so this modal talks
+to each wallet's injected extension provider directly -- fully functional
+for desktop Phantom / Trust Wallet / MetaMask today. The `connect()`
+dispatch below is written so a WalletConnect provider can be slotted in
+as a fourth branch once WALLETCONNECT_PROJECT_ID is available.
+{% endcomment %}
+<div x-show="walletModalOpen" x-cloak
+     x-transition.opacity
+     class="fixed inset-0 z-50 flex items-center justify-center p-4"
+     style="background: rgba(17,17,17,0.4);">
+  <div @click.outside="walletModalOpen = false"
+       x-data="walletConnect()"
+       class="w-full max-w-sm bg-cream border border-black/10 rounded-2xl p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-display font-bold text-lg">Connect Wallet</h3>
+      <button @click="walletModalOpen = false" class="text-muted hover:text-ink text-xl leading-none">&times;</button>
+    </div>
+
+    <div class="space-y-2">
+      <button @click="connect('phantom')" :disabled="busy"
+              class="w-full flex items-center gap-3 border border-black/10 rounded-2xl px-4 py-3 hover:bg-white transition disabled:opacity-50">
+        {% include "core/svg/phantom.html" %}
+        <span class="font-semibold">Phantom</span>
+      </button>
+      <button @click="connect('trust_wallet')" :disabled="busy"
+              class="w-full flex items-center gap-3 border border-black/10 rounded-2xl px-4 py-3 hover:bg-white transition disabled:opacity-50">
+        {% include "core/svg/trust_wallet.html" %}
+        <span class="font-semibold">Trust Wallet</span>
+      </button>
+      <button @click="connect('metamask')" :disabled="busy"
+              class="w-full flex items-center gap-3 border border-black/10 rounded-2xl px-4 py-3 hover:bg-white transition disabled:opacity-50">
+        {% include "core/svg/metamask.html" %}
+        <span class="font-semibold">MetaMask</span>
+      </button>
+      <button @click="connect('tronlink')" :disabled="busy"
+              class="w-full flex items-center gap-3 border border-black/10 rounded-2xl px-4 py-3 hover:bg-white transition disabled:opacity-50">
+        {% include "core/svg/tron.html" %}
+        <span class="font-semibold">TronLink</span>
+      </button>
+    </div>
+
+    <p x-show="error" x-text="error" class="mt-4 text-sm text-ballred"></p>
+    <p x-show="busy" class="mt-4 text-sm text-muted">Waiting for wallet confirmation…</p>
+
+    <p class="mt-6 text-xs text-muted">
+      By connecting, you confirm you are 18+ and agree to the
+      <a href="{% url 'legal' %}" class="underline">Terms</a>.
+    </p>
+  </div>
+</div>
+
+<script>
+const B58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+function base58Encode(bytes) {
+  let digits = [0];
+  for (let i = 0; i < bytes.length; i++) {
+    let carry = bytes[i];
+    for (let j = 0; j < digits.length; j++) {
+      carry += digits[j] << 8;
+      digits[j] = carry % 58;
+      carry = (carry / 58) | 0;
+    }
+    while (carry > 0) { digits.push(carry % 58); carry = (carry / 58) | 0; }
+  }
+  let leadingZeros = 0;
+  for (let i = 0; i < bytes.length && bytes[i] === 0; i++) leadingZeros++;
+  return B58_ALPHABET[0].repeat(leadingZeros) + digits.reverse().map(d => B58_ALPHABET[d]).join('');
+}
+function bytesToHex(bytes) {
+  return '0x' + Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function walletConnect() {
+  return {
+    busy: false,
+    error: '',
+    async connect(provider) {
+      this.error = '';
+      this.busy = true;
+      try {
+        if (provider === 'metamask') {
+          await this.connectEvm(provider);
+        } else if (provider === 'tronlink') {
+          await this.connectTron(provider);
+        } else {
+          await this.connectSolana(provider);
+        }
+      } catch (e) {
+        this.error = e.message || 'Connection failed.';
+      } finally {
+        this.busy = false;
+      }
+    },
+    async connectSolana(provider) {
+      const injected = (provider === 'trust_wallet' && window.trustwallet && window.trustwallet.solana)
+        ? window.trustwallet.solana
+        : window.solana;
+      if (!injected) {
+        throw new Error(`${provider === 'phantom' ? 'Phantom' : 'Trust Wallet'} extension not detected.`);
+      }
+      const resp = await injected.connect();
+      const address = resp.publicKey.toString();
+
+      const nonceResp = await fetch('/api/wallet/nonce/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': onlyballCsrfToken() },
+        body: JSON.stringify({ address, provider }),
+      });
+      if (!nonceResp.ok) throw new Error((await nonceResp.json()).detail || 'Could not start login.');
+      const { message } = await nonceResp.json();
+
+      const encoded = new TextEncoder().encode(message);
+      const signed = await injected.signMessage(encoded, 'utf8');
+      const signatureBytes = signed.signature || signed;
+      const signature = base58Encode(new Uint8Array(signatureBytes));
+
+      await this.finish(address, signature);
+    },
+    async connectEvm(provider) {
+      if (!window.ethereum) throw new Error('MetaMask extension not detected.');
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const address = accounts[0];
+
+      const nonceResp = await fetch('/api/wallet/nonce/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': onlyballCsrfToken() },
+        body: JSON.stringify({ address, provider }),
+      });
+      if (!nonceResp.ok) throw new Error((await nonceResp.json()).detail || 'Could not start login.');
+      const { message } = await nonceResp.json();
+
+      const messageHex = bytesToHex(new TextEncoder().encode(message));
+      const signature = await window.ethereum.request({
+        method: 'personal_sign',
+        params: [messageHex, address],
+      });
+
+      await this.finish(address, signature);
+    },
+    async connectTron(provider) {
+      if (!window.tronLink) throw new Error('TronLink extension not detected.');
+      await window.tronLink.request({ method: 'tron_requestAccounts' });
+
+      const tronWeb = window.tronWeb;
+      if (!tronWeb || !tronWeb.ready) throw new Error('Unlock TronLink and try again.');
+      const address = tronWeb.defaultAddress.base58;
+
+      const nonceResp = await fetch('/api/wallet/nonce/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': onlyballCsrfToken() },
+        body: JSON.stringify({ address, provider }),
+      });
+      if (!nonceResp.ok) throw new Error((await nonceResp.json()).detail || 'Could not start login.');
+      const { message } = await nonceResp.json();
+
+      const signMessage = tronWeb.trx.signMessageV2 || tronWeb.trx.sign;
+      const signature = await signMessage.call(tronWeb.trx, message);
+
+      await this.finish(address, signature);
+    },
+    async finish(address, signature) {
+      const verifyResp = await fetch('/api/wallet/verify/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': onlyballCsrfToken() },
+        body: JSON.stringify({ address, signature }),
+      });
+      if (!verifyResp.ok) throw new Error((await verifyResp.json()).detail || 'Signature verification failed.');
+      const data = await verifyResp.json();
+      window.location.href = data.redirect || '/account/';
+    },
+  };
+}
+</script>

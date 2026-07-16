@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Not available in your region — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="max-w-md mx-auto px-4 py-24 text-center">
+  {% include "core/svg/ball_logo.html" with size=64 %}
+  <h1 class="font-display font-bold text-2xl mt-6 mb-3">Not available in your region</h1>
+  <p class="text-sm text-muted">
+    OnlyBall is not available to visitors from{% if country %} <strong>{{ country }}</strong>{% endif %}
+    due to local gaming regulations. See our <a href="{% url 'legal' %}" class="underline">Legal page</a> for details.
+  </p>
+</section>
+{% endblock %}

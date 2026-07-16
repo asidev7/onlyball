@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Get $BALL — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="max-w-md mx-auto px-4 py-16">
+  <h1 class="font-display font-bold text-3xl mb-2 text-center">Get $BALL</h1>
+  <p class="text-sm text-muted mb-8 text-center">
+    Your balance: <span class="font-semibold text-ink">${{ usdt_balance|floatformat:2 }} USDT</span>
+  </p>
+
+  <div x-data="{
+        usdt: 10,
+        ballPrice: {{ ball_price_usdt }},
+        threshold: {{ ticket_threshold }},
+        get ball() { return this.usdt > 0 ? (this.usdt / this.ballPrice) : 0 },
+        get tickets() { return Math.floor(this.ball / this.threshold) },
+      }" class="border border-black/10 rounded-2xl p-6 bg-white mb-6">
+    <form method="post" class="space-y-4">
+      {% csrf_token %}
+      <div>
+        <label class="block text-sm font-semibold mb-1">{{ form.usdt_amount.label }}</label>
+        <input type="number" step="0.01" min="0.01" name="usdt_amount" x-model.number="usdt" required>
+        {% for error in form.usdt_amount.errors %}<p class="text-xs text-ballred mt-1">{{ error }}</p>{% endfor %}
+      </div>
+
+      <div class="rounded-2xl border border-black/10 p-4 bg-cream text-sm space-y-2">
+        <div class="flex justify-between"><span class="text-muted">You receive</span><span class="font-bold tabular-nums" x-text="ball.toLocaleString(undefined, {maximumFractionDigits: 2}) + ' $BALL'"></span></div>
+        <div class="flex justify-between"><span class="text-muted">Tonight's tickets</span><span class="font-bold tabular-nums" x-text="tickets"></span></div>
+        <div class="flex justify-between text-xs text-muted"><span>Rate</span><span>{{ ball_price_usdt }} USDT = 1 $BALL</span></div>
+      </div>
+
+      <button type="submit" class="w-full bg-ballred text-white font-bold px-6 py-3 rounded-2xl border border-black/10 hover:opacity-90 transition">
+        Confirm purchase
+      </button>
+    </form>
+  </div>
+
+  <p class="text-xs text-muted text-center">
+    Each purchase is split: 70% jackpot, 20% rollover, 10% platform fee (see <a href="{% url 'legal' %}" class="underline">Legal</a>).
+    No USDT? <a href="{% url 'deposit' %}" class="text-ballred font-semibold hover:underline">Deposit first</a>.
+  </p>
+</section>
+{% endblock %}

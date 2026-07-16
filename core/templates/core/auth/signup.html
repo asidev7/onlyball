@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Sign up — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="max-w-md mx-auto px-4 py-16">
+  <h1 class="font-display font-bold text-3xl mb-2">Create your account</h1>
+
+  <form method="post" class="space-y-4">
+    {% csrf_token %}
+    {% for field in form %}
+    <div>
+      <label class="block text-sm font-semibold mb-1">{{ field.label }}</label>
+      {{ field }}
+      {% if field.help_text %}<p class="text-xs text-muted mt-1">{{ field.help_text }}</p>{% endif %}
+      {% for error in field.errors %}<p class="text-xs text-ballred mt-1">{{ error }}</p>{% endfor %}
+    </div>
+    {% endfor %}
+    <button type="submit" class="w-full bg-ballred text-white font-bold px-6 py-3 rounded-2xl border border-black/10 hover:opacity-90 transition">
+      Create account
+    </button>
+  </form>
+
+  <p class="text-xs text-muted mt-6">You must be 18 or older to create an OnlyBall account. See our <a href="{% url 'legal' %}" class="underline">Terms</a>.</p>
+  <p class="text-sm mt-4">Already have an account? <a href="{% url 'login' %}" class="text-ballred font-semibold hover:underline">Sign in</a></p>
+</section>
+{% endblock %}

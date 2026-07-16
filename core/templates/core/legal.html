@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Legal — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="max-w-3xl mx-auto px-4 py-16 space-y-10 text-sm">
+  <div>
+    <h1 class="font-display font-bold text-3xl mb-4">Legal & Responsible Gaming</h1>
+    <p class="text-muted">OnlyBall is a game of chance involving real USDT. Please read this page before playing.</p>
+  </div>
+
+  <div class="border border-black/10 rounded-2xl p-6 bg-white">
+    <h2 class="font-display font-bold text-lg mb-3">18+ only</h2>
+    <p class="text-muted">You must be 18 years or older to create an account or play. Age is verified at signup via your
+      declared date of birth; providing false information to circumvent this is a violation of these terms.</p>
+  </div>
+
+  <div class="border border-black/10 rounded-2xl p-6 bg-white">
+    <h2 class="font-display font-bold text-lg mb-3">Restricted jurisdictions</h2>
+    <p class="text-muted mb-2">OnlyBall is not available to residents of, or persons physically located in, the following
+      jurisdictions: <strong>{{ BLOCKED_COUNTRIES|join:", " }}</strong>. Access from these locations is blocked.</p>
+    <p class="text-muted">This list is not exhaustive of every jurisdiction where online lottery-style gaming may be
+      restricted; you are responsible for confirming that participation is lawful where you live.</p>
+  </div>
+
+  <div class="border border-black/10 rounded-2xl p-6 bg-white">
+    <h2 class="font-display font-bold text-lg mb-3">How the drawing works & your odds</h2>
+    <p class="text-muted mb-2">Every 100 $BALL you hold earns one ticket in that night's drawing, with no cap. Your odds
+      of winning any given drawing are exactly <code>(your tickets) / (total tickets sold that night)</code> — visible
+      on your <a href="{% url 'account' %}" class="underline">account page</a> before every drawing. OnlyBall makes
+      no guarantee that you will win, and past results are not indicative of future outcomes.</p>
+    <p class="text-muted">The winner is selected by a provably-fair algorithm, not by OnlyBall staff. See
+      <a href="{% url 'fair' %}" class="underline">/fair</a> to verify any past drawing, or
+      <a href="{% static 'verify_draw.py' %}" class="underline">download the verification script</a>.</p>
+  </div>
+
+  <div class="border border-black/10 rounded-2xl p-6 bg-white">
+    <h2 class="font-display font-bold text-lg mb-3">Fees & payout split</h2>
+    <p class="text-muted">Every $BALL purchase is split: <strong>{{ config.jackpot_bps|floatformat:0 }} bps</strong>
+      ({{ config.jackpot_bps }} / 10000) to tonight's jackpot, <strong>{{ config.rollover_bps }} bps</strong> to the
+      rollover pool, and <strong>{{ config.fee_bps }} bps</strong> retained as a platform fee. $BALL currently costs
+      {{ config.ball_price_usdt }} USDT and {{ config.ticket_threshold }} $BALL earns one ticket. Any change to these
+      rates is logged in an immutable audit trail.</p>
+  </div>
+
+  <div class="border border-black/10 rounded-2xl p-6 bg-white">
+    <h2 class="font-display font-bold text-lg mb-3">KYC & withdrawals</h2>
+    <p class="text-muted">Identity verification (KYC) is required once your cumulative deposits, or any single
+      withdrawal, reach {{ config.kyc_threshold_usdt }} USDT. The minimum withdrawal amount is
+      {{ config.min_withdraw_usdt }} USDT.</p>
+  </div>
+
+  <div class="border border-black/10 rounded-2xl p-6 bg-white">
+    <h2 class="font-display font-bold text-lg mb-3">Responsible gaming</h2>
+    <p class="text-muted mb-2">From your <a href="{% url 'account' %}" class="underline">account page</a> you can:</p>
+    <ul class="list-disc list-inside text-muted space-y-1">
+      <li>Set a personal weekly deposit cap.</li>
+      <li>Self-exclude for 7, 30, or 90 days — this immediately signs you out and blocks deposits, purchases, and
+        withdrawals for the selected period.</li>
+    </ul>
+    <p class="text-muted mt-2">If you feel your gambling is a problem, resources such as the National Council on
+      Problem Gambling (1-800-522-4700, US) offer free, confidential support.</p>
+  </div>
+
+  <div class="border border-black/10 rounded-2xl p-6 bg-white">
+    <h2 class="font-display font-bold text-lg mb-3">What $BALL is (and isn't)</h2>
+    <p class="text-muted">$BALL is an internal accounting balance tracked in OnlyBall's database. It is not a token
+      deployed on any blockchain, is not transferable outside your OnlyBall account, and has no value outside of
+      earning tickets for the nightly drawing. USDT deposits and withdrawals are processed via NowPayments in
+      USDT-TRC20 (Tron network). The nightly drawing separately uses a public Solana blockhash purely as an
+      unpredictable random beacon (see <a href="{% url 'fair' %}" class="underline">/fair</a>) — no funds ever move
+      on Solana.</p>
+  </div>
+
+  <div class="border border-black/10 rounded-2xl p-6 bg-white">
+    <h2 class="font-display font-bold text-lg mb-3">Operating disclaimer</h2>
+    <p class="text-muted">This software is provided as a reference implementation. Operating a real-money lottery is a
+      regulated activity in most jurisdictions. Do not accept real user funds in production without first obtaining a
+      valid gaming/lottery license in every jurisdiction where you intend to operate, and independent legal review of
+      this page and the underlying terms of service.</p>
+  </div>
+</section>
+{% endblock %}

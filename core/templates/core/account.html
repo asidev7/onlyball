@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Account — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="max-w-3xl mx-auto px-4 py-12">
+  <h1 class="font-display font-bold text-3xl mb-8">Your account</h1>
+
+  <div class="grid sm:grid-cols-3 gap-4 mb-10">
+    <div class="border border-black/10 rounded-2xl p-5 bg-white hover-lift">
+      <p class="text-xs uppercase tracking-widest text-muted mb-1">USDT balance</p>
+      <p class="font-display font-extrabold text-2xl tabular-nums">${{ usdt_balance|floatformat:2 }}</p>
+    </div>
+    <div class="border border-black/10 rounded-2xl p-5 bg-white hover-lift">
+      <p class="text-xs uppercase tracking-widest text-muted mb-1">$BALL balance</p>
+      <p class="font-display font-extrabold text-2xl tabular-nums">{{ ball_balance|floatformat:0 }}</p>
+    </div>
+    <div class="border border-black/10 rounded-2xl p-5 bg-white hover-lift">
+      <p class="text-xs uppercase tracking-widest text-muted mb-1">Tickets tonight</p>
+      <p class="font-display font-extrabold text-2xl tabular-nums">{{ tickets_tonight }}</p>
+      <p class="text-xs text-muted mt-1">Odds: {{ odds }}</p>
+    </div>
+  </div>
+
+  <div class="flex flex-wrap gap-3 mb-10">
+    <a href="{% url 'deposit' %}" class="bg-ballred text-white font-bold px-5 py-2.5 rounded-2xl border border-black/10 hover:opacity-90 transition text-sm">Deposit</a>
+    <a href="{% url 'buy' %}" class="border border-black/20 font-bold px-5 py-2.5 rounded-2xl hover:bg-white transition text-sm">Buy $BALL</a>
+    <a href="{% url 'withdraw' %}" class="border border-black/20 font-bold px-5 py-2.5 rounded-2xl hover:bg-white transition text-sm">Withdraw</a>
+  </div>
+
+  <div class="mb-10">
+    <h2 class="font-display font-bold text-xl mb-3">Payout address (USDT-TRC20)</h2>
+    <form method="post" action="{% url 'set_payout_address' %}" class="border border-black/10 rounded-2xl p-5 bg-white flex flex-col sm:flex-row gap-3">
+      {% csrf_token %}
+      {{ payout_address_form.usdt_trc20_payout_address }}
+      <button type="submit" class="shrink-0 bg-ballred text-white font-bold px-5 py-2.5 rounded-2xl border border-black/10 hover:opacity-90 transition text-sm">Save</button>
+    </form>
+    <p class="text-xs text-muted mt-2">Jackpot wins are paid automatically to this address (via NowPayments). Required to withdraw.</p>
+  </div>
+
+  <div class="mb-10">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="font-display font-bold text-xl">Linked wallets</h2>
+      <button @click="walletModalOpen = true" class="text-sm font-semibold text-ballred hover:underline">+ Link a wallet</button>
+    </div>
+    <div class="border border-black/10 rounded-2xl divide-y divide-black/5 bg-white">
+      {% for wallet in wallets %}
+      <div class="px-4 py-3 flex items-center justify-between text-sm">
+        <span class="font-mono">{{ wallet.address|slice:":6" }}…{{ wallet.address|slice:"-4:" }}</span>
+        <span class="text-muted">{{ wallet.get_provider_display }}</span>
+        <span class="{% if wallet.verified_at %}text-green-700{% else %}text-muted{% endif %}">{% if wallet.verified_at %}Verified{% else %}Pending{% endif %}</span>
+      </div>
+      {% empty %}
+      <p class="px-4 py-4 text-sm text-muted">No wallet linked yet. A linked wallet identifies your account for sign-in — set a payout address above to receive funds.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="mb-10">
+    <h2 class="font-display font-bold text-xl mb-3">History</h2>
+    <div class="border border-black/10 rounded-2xl overflow-x-auto bg-white">
+      <table class="w-full text-sm">
+        <thead><tr class="text-left text-muted border-b border-black/10">
+          <th class="px-4 py-3 font-medium">Date</th>
+          <th class="px-4 py-3 font-medium">Type</th>
+          <th class="px-4 py-3 font-medium">USDT</th>
+          <th class="px-4 py-3 font-medium">$BALL</th>
+        </tr></thead>
+        <tbody>
+          {% for entry in ledger_entries %}
+          <tr class="border-b border-black/5 last:border-0">
+            <td class="px-4 py-3">{{ entry.created_at|date:"Y-m-d H:i" }}</td>
+            <td class="px-4 py-3">{{ entry.get_entry_type_display }}</td>
+            <td class="px-4 py-3 tabular-nums {% if entry.usdt_delta < 0 %}text-ballred{% endif %}">{{ entry.usdt_delta|floatformat:2 }}</td>
+            <td class="px-4 py-3 tabular-nums">{{ entry.ball_delta|floatformat:0 }}</td>
+          </tr>
+          {% empty %}
+          <tr><td class="px-4 py-4 text-muted" colspan="4">No activity yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="mb-10">
+    <h2 class="font-display font-bold text-xl mb-3">Responsible gaming</h2>
+    <div class="border border-black/10 rounded-2xl p-5 bg-white grid sm:grid-cols-2 gap-6">
+      <form method="post" action="{% url 'set_deposit_cap' %}">
+        {% csrf_token %}
+        <label class="block text-sm font-semibold mb-1">Weekly deposit cap (USDT)</label>
+        {{ deposit_cap_form.weekly_deposit_cap_usdt }}
+        <button type="submit" class="mt-3 text-sm font-bold border border-black/20 rounded-2xl px-4 py-2 hover:bg-cream">Save cap</button>
+      </form>
+      <form method="post" action="{% url 'self_exclude' %}" onsubmit="return confirm('This will sign you out and block deposits/buys/withdrawals for the selected period. Continue?');">
+        {% csrf_token %}
+        <label class="block text-sm font-semibold mb-1">Self-exclude</label>
+        {{ self_exclusion_form.days }}
+        <button type="submit" class="mt-3 text-sm font-bold border border-black/20 rounded-2xl px-4 py-2 hover:bg-cream">Self-exclude</button>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}

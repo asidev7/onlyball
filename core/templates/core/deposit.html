@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Deposit — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="max-w-md mx-auto px-4 py-16 text-center">
+  <div class="flex justify-center mb-4">{% include "core/svg/usdt.html" %}</div>
+  <h1 class="font-display font-bold text-3xl mb-2">Deposit USDT</h1>
+  <p class="text-sm text-muted mb-8">Deposits settle in USDT (TRC20 — Tron network), either instantly via NowPayments or manually with admin review.</p>
+
+  {% if over_weekly_cap %}
+  <div class="border border-ballred/30 bg-red-50 text-ballred rounded-2xl p-4 mb-6 text-sm text-left">
+    You've deposited ${{ weekly_deposits|floatformat:2 }} in the last 7 days, at or above the
+    ${{ user.weekly_deposit_cap_usdt|floatformat:2 }} weekly cap you set. Consider pausing, adjusting your
+    cap, or <a href="{% url 'account' %}" class="underline">visiting your account</a> to self-exclude.
+  </div>
+  {% endif %}
+
+  {% if open_deposit %}
+    {% if open_deposit.method == 'manual' %}
+    <div x-data="depositStatus({{ open_deposit.pk }}, '{{ open_deposit.status }}')" x-init="init()">
+      <div class="border border-black/10 rounded-2xl p-6 mb-6 bg-white text-left">
+        <p class="text-xs uppercase tracking-widest text-muted mb-3">Manual deposit</p>
+        <p class="text-sm text-muted mb-1">Amount claimed: <span class="font-semibold text-ink">${{ open_deposit.price_amount|floatformat:2 }}</span></p>
+        <p class="text-sm text-muted mb-4">Tx hash: <code class="text-xs break-all">{{ open_deposit.tx_hash }}</code></p>
+        <p class="text-sm" x-show="status === 'pending_review'">
+          <span class="inline-block w-2 h-2 rounded-full bg-yellow-500 mr-1"></span>
+          Pending admin review — this usually takes a few hours. This page updates automatically once it's confirmed.
+        </p>
+        <p class="text-sm text-ballred font-semibold" x-show="status === 'failed'">
+          This deposit was rejected. Double check the transaction hash and amount, then try again below.
+        </p>
+      </div>
+    </div>
+    {% else %}
+    <div x-data="depositStatus({{ open_deposit.pk }}, '{{ open_deposit.status }}')" x-init="init()">
+      <div class="border border-black/10 rounded-2xl p-6 mb-4 bg-white">
+        <p class="text-sm text-muted mb-4">Pay <span class="font-semibold text-ink">${{ open_deposit.price_amount|floatformat:2 }}</span> in USDT-TRC20 through NowPayments' secure checkout:</p>
+        <a href="{{ open_deposit.invoice_url }}" target="_blank" rel="noopener"
+           class="inline-flex items-center justify-center gap-2 w-full bg-ballred text-white font-bold px-6 py-3 rounded-2xl border border-black/10 hover:opacity-90 transition">
+          {% include "core/svg/tron.html" %}
+          Pay with USDT-TRC20 →
+        </a>
+        <p class="text-xs text-muted mt-3">Status: <span x-text="status" class="font-semibold"></span></p>
+      </div>
+
+      {% if open_deposit.pay_address %}
+      <div class="border border-black/10 rounded-2xl p-6 mb-6 bg-white text-left">
+        <p class="text-xs uppercase tracking-widest text-muted mb-3">Or send manually</p>
+        <div class="mx-auto w-40 h-40 flex items-center justify-center [&_svg]:w-full [&_svg]:h-full mb-4">
+          {{ qr_svg|safe }}
+        </div>
+        <div class="border border-black/10 rounded-2xl p-3 mb-3 flex items-center justify-between gap-3">
+          <code class="text-xs break-all">{{ open_deposit.pay_address }}</code>
+          <button type="button" onclick="navigator.clipboard.writeText('{{ open_deposit.pay_address }}')"
+                  class="shrink-0 text-xs font-bold border border-black/20 rounded-2xl px-3 py-2 hover:bg-cream">
+            Copy
+          </button>
+        </div>
+        <p class="text-xs text-muted">Send exactly <span class="tabular-nums font-semibold">{{ open_deposit.pay_amount }}</span> USDT-TRC20 — sending on another chain or token will result in lost funds.</p>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  {% else %}
+  <div x-data="{ tab: '{% if manual_form.errors %}manual{% else %}nowpayments{% endif %}' }">
+    <div class="flex border border-black/10 rounded-2xl bg-white p-1 mb-6 text-sm font-semibold">
+      <button type="button" @click="tab = 'nowpayments'"
+              :class="tab === 'nowpayments' ? 'bg-ballred text-white' : 'text-muted'"
+              class="flex-1 rounded-xl py-2 transition">Instant (NowPayments)</button>
+      <button type="button" @click="tab = 'manual'"
+              :class="tab === 'manual' ? 'bg-ballred text-white' : 'text-muted'"
+              class="flex-1 rounded-xl py-2 transition">Manual USDT-TRC20</button>
+    </div>
+
+    <div x-show="tab === 'nowpayments'" x-cloak>
+      <form method="post" class="space-y-4 border border-black/10 rounded-2xl p-6 bg-white mb-8 text-left">
+        {% csrf_token %}
+        <input type="hidden" name="method" value="nowpayments">
+        <div>
+          <label class="block text-sm font-semibold mb-1">{{ form.usdt_amount.label }}</label>
+          {{ form.usdt_amount }}
+          <p class="text-xs text-muted mt-1">Minimum deposit: $10 USDT.</p>
+          {% for error in form.usdt_amount.errors %}<p class="text-xs text-ballred mt-1">{{ error }}</p>{% endfor %}
+        </div>
+        <button type="submit" class="w-full bg-ballred text-white font-bold px-6 py-3 rounded-2xl border border-black/10 hover:opacity-90 transition">
+          Get payment link
+        </button>
+      </form>
+    </div>
+
+    <div x-show="tab === 'manual'" x-cloak class="text-left">
+      {% if manual_deposit_address %}
+      <div class="border border-black/10 rounded-2xl p-6 mb-4 bg-white">
+        <p class="text-xs uppercase tracking-widest text-muted mb-3">1. Send USDT-TRC20 to this address</p>
+        <div class="mx-auto w-40 h-40 flex items-center justify-center [&_svg]:w-full [&_svg]:h-full mb-4">
+          {{ manual_qr_svg|safe }}
+        </div>
+        <div class="border border-black/10 rounded-2xl p-3 mb-3 flex items-center justify-between gap-3">
+          <code class="text-xs break-all">{{ manual_deposit_address }}</code>
+          <button type="button" onclick="navigator.clipboard.writeText('{{ manual_deposit_address }}')"
+                  class="shrink-0 text-xs font-bold border border-black/20 rounded-2xl px-3 py-2 hover:bg-cream">
+            Copy
+          </button>
+        </div>
+        <p class="text-xs text-muted">Send on the Tron network only — sending on another chain or token will result in lost funds.</p>
+      </div>
+
+      <form method="post" class="space-y-4 border border-black/10 rounded-2xl p-6 bg-white mb-8">
+        {% csrf_token %}
+        <input type="hidden" name="method" value="manual">
+        <p class="text-xs uppercase tracking-widest text-muted">2. Confirm what you sent</p>
+        <div>
+          <label class="block text-sm font-semibold mb-1">{{ manual_form.usdt_amount.label }}</label>
+          {{ manual_form.usdt_amount }}
+          {% for error in manual_form.usdt_amount.errors %}<p class="text-xs text-ballred mt-1">{{ error }}</p>{% endfor %}
+        </div>
+        <div>
+          <label class="block text-sm font-semibold mb-1">Transaction hash</label>
+          {{ manual_form.tx_hash }}
+          <p class="text-xs text-muted mt-1">{{ manual_form.tx_hash.help_text }}</p>
+          {% for error in manual_form.tx_hash.errors %}<p class="text-xs text-ballred mt-1">{{ error }}</p>{% endfor %}
+        </div>
+        <button type="submit" class="w-full bg-ballred text-white font-bold px-6 py-3 rounded-2xl border border-black/10 hover:opacity-90 transition">
+          Submit for review
+        </button>
+        <p class="text-xs text-muted">An admin reviews and credits manual deposits by hand — this is slower than the instant option above.</p>
+      </form>
+      {% else %}
+      <div class="border border-black/10 rounded-2xl p-6 mb-8 bg-white text-sm text-muted">
+        Manual deposits aren't available right now. Use the instant option instead.
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <a href="{% url 'buy' %}" class="inline-block bg-ballred text-white font-bold px-8 py-3 rounded-2xl border border-black/10 hover:opacity-90 transition">
+    Continue to Buy $BALL
+  </a>
+</section>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+function depositStatus(id, initial) {
+  return {
+    status: initial,
+    init() {
+      if (['finished', 'failed', 'refunded', 'expired'].includes(this.status)) return;
+      this.poll = setInterval(() => {
+        fetch(`/api/deposits/${id}/status/`).then(r => r.json()).then(d => {
+          this.status = d.status;
+          if (['finished', 'failed', 'refunded', 'expired'].includes(d.status)) {
+            clearInterval(this.poll);
+            if (d.status === 'finished') location.reload();
+          }
+        });
+      }, 5000);
+    },
+  };
+}
+</script>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<p>Withdrawal #{{ withdrawal.pk }} — {{ withdrawal.user }} — {{ withdrawal.amount_usdt }} USDT to {{ withdrawal.address }}</p>
+<p>Payout batch: {{ withdrawal.payout_id }}</p>
+<form method="post">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <input type="submit" value="Verify &amp; send" class="default">
+</form>
+{% endblock %}

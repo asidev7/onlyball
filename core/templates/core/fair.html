@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Provably fair — {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="max-w-3xl mx-auto px-4 py-16">
+  <h1 class="font-display font-bold text-3xl mb-6">Provably fair drawings</h1>
+
+  <div class="space-y-4 text-sm text-muted mb-10">
+    <p>OnlyBall has no smart contract, so the drawing is made trustworthy by a
+      <strong class="text-ink">commit-reveal</strong> scheme instead of a blockchain program. Every
+      drawing goes through five steps, each one recorded immutably:</p>
+    <ol class="list-decimal list-inside space-y-2 text-ink">
+      <li><strong>Commit</strong> — at 00:01 ET the server generates a random 32-byte <code>server_seed</code> and
+        immediately publishes <code>server_seed_hash = SHA-256(server_seed)</code>. The real seed stays hidden.</li>
+      <li><strong>Snapshot</strong> — at 23:50 ET the ticket list is frozen: every account's ticket range,
+        ordered by user id. <code>snapshot_hash = SHA-256(canonical_json(snapshot))</code> is published.</li>
+      <li><strong>Beacon</strong> — at 00:00 ET the server reads the latest finalized Solana blockhash: a value
+        nobody (including OnlyBall) could know before the drawing opened.</li>
+      <li><strong>Draw</strong> — <code>winning_number = HMAC_SHA256(key=server_seed, msg=snapshot_hash + beacon) mod total_tickets</code>.
+        The ticket range containing that number wins.</li>
+      <li><strong>Reveal</strong> — the server_seed, beacon, snapshot and winning number are published immediately,
+        so anyone can redo step 4 and confirm the result.</li>
+    </ol>
+    <p>Because <code>server_seed_hash</code> is published before tickets close, OnlyBall cannot change the seed
+      after seeing who bought tickets. Because the beacon is a Solana blockhash from <em>after</em> the snapshot,
+      nobody could have pre-computed a favorable outcome either.</p>
+  </div>
+
+  <div class="border border-black/10 rounded-2xl p-6 bg-white mb-10" x-data="fairVerifier()">
+    <h2 class="font-display font-bold text-xl mb-4">Verify a drawing</h2>
+
+    <div class="mb-4">
+      <label class="block text-sm font-semibold mb-1">Pick a past drawing</label>
+      <select @change="loadDraw($event.target.value)">
+        <option value="">— select —</option>
+        {% for draw in recent_draws %}
+        <option value="{{ draw.pk }}">{{ draw.draw_date }} (${{ draw.jackpot_usdt|floatformat:2 }})</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="grid sm:grid-cols-2 gap-4 mb-4 text-sm">
+      <div><label class="block font-semibold mb-1">server_seed (hex)</label><input type="text" x-model="serverSeed" class="font-mono"></div>
+      <div><label class="block font-semibold mb-1">snapshot_hash (hex)</label><input type="text" x-model="snapshotHash" class="font-mono"></div>
+      <div><label class="block font-semibold mb-1">beacon_blockhash</label><input type="text" x-model="beacon" class="font-mono"></div>
+      <div><label class="block font-semibold mb-1">total_tickets</label><input type="number" x-model.number="totalTickets"></div>
+    </div>
+
+    <button @click="verify()" class="bg-ballred text-white font-bold px-6 py-2.5 rounded-2xl border border-black/10 hover:opacity-90 transition text-sm">
+      Recompute winning number
+    </button>
+
+    <div class="mt-4 text-sm" x-show="result !== null" x-cloak>
+      <p>Computed winning number: <span class="font-bold tabular-nums" x-text="result"></span></p>
+      <p x-show="expected !== null">Published winning number: <span class="font-bold tabular-nums" x-text="expected"></span></p>
+      <p class="mt-2 font-bold" :class="matches ? 'text-green-700' : 'text-ballred'" x-text="matches ? 'Match — this drawing verifies correctly.' : 'Mismatch.'"></p>
+    </div>
+  </div>
+
+  <p class="text-sm text-muted">
+    Prefer to verify offline?
+    <a href="{% url 'legal' %}" class="text-ballred hover:underline">Download the Python verification script</a>
+    and run <code>python verify_draw.py &lt;draw_id&gt;</code> — it calls the public
+    <code>/api/draws/&lt;id&gt;/</code> endpoint and performs the exact same computation.
+  </p>
+</section>
+
+<script>
+function fairVerifier() {
+  return {
+    serverSeed: '', snapshotHash: '', beacon: '', totalTickets: 0,
+    result: null, expected: null, matches: false,
+    async loadDraw(id) {
+      if (!id) return;
+      const r = await fetch(`/api/draws/${id}/`);
+      const d = await r.json();
+      this.serverSeed = d.server_seed || '';
+      this.snapshotHash = d.snapshot_hash || '';
+      this.beacon = d.beacon_blockhash || '';
+      this.totalTickets = d.total_tickets || 0;
+      this.expected = d.winning_number;
+    },
+    async verify() {
+      if (!this.serverSeed || !this.snapshotHash || !this.totalTickets) return;
+      const keyBytes = new Uint8Array(this.serverSeed.match(/.{1,2}/g).map(b => parseInt(b, 16)));
+      const msgBytes = new TextEncoder().encode(this.snapshotHash + this.beacon);
+      const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+      const sig = await crypto.subtle.sign('HMAC', key, msgBytes);
+      const hex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
+      const n = BigInt('0x' + hex) % BigInt(this.totalTickets);
+      this.result = n.toString();
+      this.matches = this.expected !== null && this.result === String(this.expected);
+    },
+  };
+}
+</script>
+{% endblock %}
