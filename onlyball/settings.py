@@ -135,6 +135,11 @@ LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/account/'
 LOGOUT_REDIRECT_URL = '/'
 
+# nginx terminates TLS in front of this app, so DEBUG=False in production
+# implies HTTPS-only traffic reaches Django.
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
 # --- Celery / Redis ---
 REDIS_URL = env('REDIS_URL', default='redis://localhost:6379/0')
 CELERY_BROKER_URL = REDIS_URL
